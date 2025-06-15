@@ -1,0 +1,198 @@
+<div class="max-w-4xl mx-auto">
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-2xl font-bold">Your Todos</h1>
+    <button id="newTodoBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+      <i class="fas fa-plus mr-2"></i>New Todo
+    </button>
+  </div>
+
+  <!-- Todo Form (Initially Hidden) -->
+  <div id="todoFormContainer" class="hidden mb-8 bg-white p-6 rounded shadow">
+    <h2 class="text-xl font-semibold mb-4">Add New Todo</h2>
+    <form id="todoForm">
+      <div class="mb-4">
+        <label for="title" class="block text-gray-700 mb-2">Title*</label>
+        <input type="text" id="title" name="title" required
+          class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      
+      <div class="mb-4">
+        <label for="description" class="block text-gray-700 mb-2">Description</label>
+        <textarea id="description" name="description" rows="3"
+          class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+      </div>
+      
+      <div class="flex space-x-4 mb-4">
+        <div class="w-1/2">
+          <label for="dueDate" class="block text-gray-700 mb-2">Due Date</label>
+          <input type="date" id="dueDate" name="dueDate"
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        
+        <div class="w-1/2">
+          <label for="priority" class="block text-gray-700 mb-2">Priority</label>
+          <select id="priority" name="priority"
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="flex justify-end space-x-2">
+        <button type="button" id="cancelTodoBtn" class="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100">
+          Cancel
+        </button>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          Save Todo
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Todos List -->
+  <div id="todosList">
+    <% if (todos.length === 0) { %>
+      <div class="bg-white p-8 rounded shadow text-center">
+        <p class="text-gray-600">You don't have any todos yet. Create your first todo!</p>
+      </div>
+    <% } else { %>
+      <% todos.forEach(todo => { %>
+        <div class="bg-white p-4 mb-4 rounded shadow" data-id="<%= todo._id %>">
+          <div class="flex justify-between items-start">
+            <div class="flex items-center">
+              <input type="checkbox" <%= todo.completed ? 'checked' : '' %>
+                class="todo-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500 mr-3"
+                data-id="<%= todo._id %>">
+              <div>
+                <h3 class="text-lg font-medium <%= todo.completed ? 'line-through text-gray-500' : 'text-gray-800' %>">
+                  <%= todo.title %>
+                </h3>
+                <% if (todo.description) { %>
+                  <p class="text-gray-600 mt-1"><%= todo.description %></p>
+                <% } %>
+                <div class="flex items-center mt-2 text-sm text-gray-500">
+                  <% if (todo.dueDate) { %>
+                    <span class="flex items-center mr-4">
+                      <i class="far fa-calendar-alt mr-1"></i>
+                      <%= new Date(todo.dueDate).toLocaleDateString() %>
+                    </span>
+                  <% } %>
+                  <span class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-1"></i>
+                    <span class="capitalize"><%= todo.priority %></span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <button class="delete-todo text-red-600 hover:text-red-800" data-id="<%= todo._id %>">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      <% }); %>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  // Show/hide todo form
+  document.getElementById('newTodoBtn').addEventListener('click', () => {
+    document.getElementById('todoFormContainer').classList.toggle('hidden');
+  });
+
+  document.getElementById('cancelTodoBtn').addEventListener('click', () => {
+    document.getElementById('todoFormContainer').classList.add('hidden');
+    document.getElementById('todoForm').reset();
+  });
+
+  // Handle todo form submission
+  document.getElementById('todoForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+      title: document.getElementById('title').value,
+      description: document.getElementById('description').value,
+      dueDate: document.getElementById('dueDate').value,
+      priority: document.getElementById('priority').value
+    };
+
+    try {
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Failed to create todo');
+      }
+    } catch (err) {
+      console.error('Error:', err);
+      alert('An error occurred while creating todo');
+    }
+  });
+
+  // Handle todo completion toggle
+  document.querySelectorAll('.todo-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', async function() {
+      const todoId = this.dataset.id;
+      const completed = this.checked;
+
+      try {
+        const response = await fetch(`/api/todos/${todoId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ completed })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('Error:', error);
+          this.checked = !completed; // Revert checkbox if error
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        this.checked = !completed; // Revert checkbox if error
+      }
+    });
+  });
+
+  // Handle todo deletion
+  document.querySelectorAll('.delete-todo').forEach(button => {
+    button.addEventListener('click', async function() {
+      if (!confirm('Are you sure you want to delete this todo?')) return;
+      
+      const todoId = this.dataset.id;
+
+      try {
+        const response = await fetch(`/api/todos/${todoId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (response.ok) {
+          document.querySelector(`[data-id="${todoId}"]`).remove();
+        } else {
+          const error = await response.json();
+          alert(error.message || 'Failed to delete todo');
+        }
+      } catch (err) {
+        console.error('Error:', err);
+        alert('An error occurred while deleting todo');
+      }
+    });
+  });
+</script>
